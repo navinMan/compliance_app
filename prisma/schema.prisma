@@ -1,0 +1,265 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = env("DATABASE_PROVIDER") // "postgresql" or "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum ApiKeyRole {
+  READ_ONLY
+  AGENT_REGISTER
+  RUN_CREATE
+  EVIDENCE_READ
+  ORG_ADMIN
+}
+
+enum RunnerType {
+  MOCK
+  HTTP
+}
+
+enum RunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum OracleType {
+  DETERMINISTIC
+  LLM_JUDGE
+}
+
+enum Severity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Organization {
+  id         String    @id @default(cuid())
+  name       String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  users      User[]
+  apiKeys    ApiKey[]
+  agents     Agent[]
+  runs       Run[]
+  kmsKeyId   String?
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String?
+  passwordHash   String?
+  role           String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  createdAt      DateTime @default(now())
+  lastSeenAt     DateTime?
+
+  audits         AuditLog[]
+}
+
+model ApiKey {
+  id             String   @id @default(cuid())
+  name           String
+  hashedKey      String
+  role           ApiKeyRole
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  createdAt      DateTime @default(now())
+  revokedAt      DateTime?
+  description    String?
+}
+
+model Agent {
+  id            String    @id @default(cuid())
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  name          String
+  description   String?
+  framework     String?
+  createdAt     DateTime  @default(now())
+
+  cards         AgentCard[]
+  runs          Run[]
+}
+
+model AgentCard {
+  id             String   @id @default(cuid())
+  agent          Agent    @relation(fields: [agentId], references: [id])
+  agentId        String
+  manifest       Json
+  manifestHash   String
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
+  createdById    String?
+  createdBy      User?    @relation(fields: [createdById], references: [id])
+}
+
+model TestPack {
+  id          String    @id @default(cuid())
+  name        String
+  description String
+  createdAt   DateTime  @default(now())
+  testCases   TestCase[]
+}
+
+model TestCase {
+  id                 String     @id @default(cuid())
+  pack               TestPack   @relation(fields: [packId], references: [id])
+  packId             String
+  title              String
+  promptTemplate     String
+  oracleType         OracleType
+  expectedBehavior   String
+  severity           Severity
+  owaspAsiCategory   String
+  frameworkControlIds Json
+  createdAt          DateTime   @default(now())
+}
+
+model RegulatoryProfile {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String
+  controls    FrameworkControl[]
+  createdAt   DateTime @default(now())
+}
+
+model FrameworkControl {
+  id           String  @id @default(cuid())
+  framework    String
+  clauseId     String
+  title        String
+  description  String
+}
+
+model Run {
+  id                String     @id @default(cuid())
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  organizationId    String
+  agent             Agent      @relation(fields: [agentId], references: [id])
+  agentId           String
+  agentCardId       String
+  agentCard         AgentCard  @relation(fields: [agentCardId], references: [id])
+  regulatoryProfileId String?
+  regulatoryProfile  RegulatoryProfile? @relation(fields: [regulatoryProfileId], references: [id])
+  packIds           Json
+  status            RunStatus  @default(PENDING)
+  runnerType        RunnerType
+  startedAt         DateTime?
+  completedAt       DateTime?
+  coveragePct       Float?
+  riskScore         Float?
+  confidenceLow     Float?
+  confidenceHigh    Float?
+  judgeAgreement    Float?
+  seed              Int?
+  createdAt         DateTime   @default(now())
+
+  turns             Turn[]
+  toolCalls         ToolCallLog[]
+  findings          Finding[]
+  evidenceBundles   EvidenceBundle[]
+  calibrationRecord CalibrationRecord? @relation(fields: [calibrationRecordId], references: [id])
+  calibrationRecordId String?
+}
+
+model Turn {
+  id        String   @id @default(cuid())
+  run       Run      @relation(fields: [runId], references: [id])
+  runId     String
+  index     Int
+  input     String
+  output    String?
+  latencyMs Int?
+  createdAt DateTime @default(now())
+
+  toolCalls ToolCallLog[]
+}
+
+model ToolCallLog {
+  id              String   @id @default(cuid())
+  turn            Turn     @relation(fields: [turnId], references: [id])
+  turnId          String
+  toolName        String
+  args            Json
+  result          Json
+  allowedByManifest Boolean
+  createdAt       DateTime @default(now())
+}
+
+model Finding {
+  id          String   @id @default(cuid())
+  run         Run      @relation(fields: [runId], references: [id])
+  runId       String
+  testCaseId  String
+  severity    Severity
+  verdict     String
+  evidenceRef String?
+  createdAt   DateTime @default(now())
+
+  remediation Remediation?
+  controlMaps FindingControlMap[]
+}
+
+model FindingControlMap {
+  id          String   @id @default(cuid())
+  finding     Finding  @relation(fields: [findingId], references: [id])
+  findingId   String
+  controlId   String
+}
+
+model EvidenceBundle {
+  id            String   @id @default(cuid())
+  run           Run      @relation(fields: [runId], references: [id])
+  runId         String
+  hashChainRoot String
+  signature     String
+  storageUrl    String?
+  generatedAt   DateTime @default(now())
+  prevHash      String?
+  payload       Json
+}
+
+model Remediation {
+  id         String   @id @default(cuid())
+  finding    Finding  @relation(fields: [findingId], references: [id])
+  findingId  String
+  recommendation String
+  controlRef String?
+  createdAt  DateTime @default(now())
+}
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  userId        String?
+  action        String
+  detail        Json?
+  createdAt     DateTime @default(now())
+}
+
+model CalibrationRecord {
+  id            String   @id @default(cuid())
+  judgeModel    String
+  agreementRate Float
+  cohensKappa   Float
+  sampleSize    Int
+  timestamp     DateTime @default(now())
+}
+
+@@index([organizationId])
+@@index([agentId])
+@@index([status])
