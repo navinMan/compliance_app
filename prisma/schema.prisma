@@ -51,6 +51,7 @@ model Organization {
   apiKeys    ApiKey[]
   agents     Agent[]
   runs       Run[]
+  audits     AuditLog[]
   kmsKeyId   String?
 }
 
