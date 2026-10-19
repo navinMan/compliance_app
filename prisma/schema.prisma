@@ -173,6 +173,10 @@ model Run {
   evidenceBundles   EvidenceBundle[]
   calibrationRecord CalibrationRecord? @relation(fields: [calibrationRecordId], references: [id])
   calibrationRecordId String?
+
+  @@index([organizationId])
+  @@index([agentId])
+  @@index([status])
 }
 
 model Turn {
