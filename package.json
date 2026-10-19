@@ -9,6 +9,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev --name init",
     "db:seed": "ts-node --transpile-only prisma/seed/seed.ts",
+    "worker": "node scripts/worker.js",
     "test": "vitest"
   },
   "devDependencies": {

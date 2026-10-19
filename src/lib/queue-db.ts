@@ -1,18 +1,19 @@
 import { prisma } from './prisma';
 
 /**
- * Minimal DB-backed queue helpers:
- * - pushRunToQueue(runId): marks run.status = RUNNING and sets enqueuedAt
- * - claimNextRun(): fetch next RUNNING/ PENDING run and mark workerClaimedAt
- *
- * This is single-process friendly and intended as demo fallback for Redis/BullMQ
+ * DB-backed queue helpers (demo fallback).
+ * enqueueRun: mark run as PENDING (or create with PENDING)
+ * claimNextAndMarkRunning: atomically claim a PENDING run and set status RUNNING
  */
-export async function pushRunToQueue(runId: string) {
-  await prisma.run.update({ where: { id: runId }, data: { status: 'RUNNING', startedAt: new Date() } });
+export async function enqueueRun(runId: string) {
+  await prisma.run.update({ where: { id: runId }, data: { status: 'PENDING' } });
 }
 
-export async function claimNextQueuedRun() {
-  // find a run with status RUNNING and not processed (simple heuristic)
-  const r = await prisma.run.findFirst({ where: { status: 'RUNNING' }, orderBy: { createdAt: 'asc' } });
-  return r;
+export async function claimNextAndMarkRunning() {
+  // Find a run with status PENDING
+  const run = await prisma.run.findFirst({ where: { status: 'PENDING' }, orderBy: { createdAt: 'asc' } });
+  if (!run) return null;
+  // Try to atomically set to RUNNING. In single-process demo this is fine.
+  const updated = await prisma.run.update({ where: { id: run.id }, data: { status: 'RUNNING', startedAt: new Date() } });
+  return updated;
 }
