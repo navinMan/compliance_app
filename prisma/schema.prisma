@@ -143,6 +143,8 @@ model FrameworkControl {
   clauseId     String
   title        String
   description  String
+  regulatoryProfile RegulatoryProfile @relation(fields: [regulatoryProfileId], references: [id])
+  regulatoryProfileId String
 }
 
 model Run {
