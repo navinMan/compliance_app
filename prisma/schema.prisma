@@ -259,7 +259,3 @@ model CalibrationRecord {
   sampleSize    Int
   timestamp     DateTime @default(now())
 }
-
-@@index([organizationId])
-@@index([agentId])
-@@index([status])
