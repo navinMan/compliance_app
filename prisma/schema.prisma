@@ -251,6 +251,7 @@ model AuditLog {
   organization  Organization @relation(fields: [organizationId], references: [id])
   organizationId String
   userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
   action        String
   detail        Json?
   createdAt     DateTime @default(now())
