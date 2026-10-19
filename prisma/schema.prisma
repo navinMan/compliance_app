@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = env("DATABASE_PROVIDER") // "postgresql" or "sqlite"
+  provider = "postgresql" // previously used env("DATABASE_PROVIDER") — fixed for Prisma validation (use literal)
   url      = env("DATABASE_URL")
 }
 
